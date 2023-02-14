@@ -16,7 +16,7 @@ def main(hparams):
     model = CLIPWrapper(hparams.model_name, config, hparams.minibatch_size)
     del hparams.model_name
     dm = TextImageDataModule.from_argparse_args(hparams)
-    trainer = Trainer.from_argparse_args(hparams, precision=16, max_epochs=32)
+    trainer = Trainer.from_argparse_args(hparams, precision=16, max_epochs=200, accelerator="gpu")
     trainer.fit(model, dm)
 
 

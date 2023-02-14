@@ -21,7 +21,7 @@ def main(hparams):
     dm = TextImageDataModule.from_argparse_args(hparams, custom_tokenizer=tokenizer)
     trainer = Trainer.from_argparse_args(hparams, precision=16, max_epochs=32)
     trainer.fit(model, dm)
-
+ 
 
 if __name__ == '__main__':
     parser = ArgumentParser()

@@ -1,0 +1,11 @@
+PC-B:
+    embed_dim: 512
+    pc_length: 2048
+    pc_width: 512
+    pc_heads: 8
+    pc_layers: 12
+    context_length: 77
+    vocab_size: 49408
+    transformer_width: 512
+    transformer_heads: 8
+    transformer_layers: 12

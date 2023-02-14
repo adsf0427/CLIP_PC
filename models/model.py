@@ -236,6 +236,39 @@ class VisualTransformer(nn.Module):
 
         return x
 
+class PointCloudTransformer(nn.Module):
+    def __init__(self, input_channels: int, width: int, layers: int, heads: int, output_channels: int):
+        super().__init__()
+        self.output_channels = output_channels
+        # self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
+
+        scale = width ** -0.5
+        self.class_embedding = nn.Parameter(scale * torch.randn(width))
+        self.input_proj = nn.Linear(input_channels, width)
+        self.ln_pre = LayerNorm(width)
+
+        self.transformer = Transformer(width, layers, heads)
+
+        self.ln_post = LayerNorm(width)
+        self.output_proj = nn.Linear(width, output_channels)
+
+    def forward(self, x: torch.Tensor):
+        x = self.input_proj(x.permute(0, 2, 1))  # shape = [*, width, grid ** 2]
+
+        x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
+        # x = x + self.positional_embedding.to(x.dtype)
+
+        x = self.ln_pre(x)
+        # x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.transformer(x)
+        # x = x.permute(1, 0, 2)  # LND -> NLD
+
+        x = self.ln_post(x[:, 0, :])
+
+        x = self.output_proj(x)
+
+        return x
+
 
 class CLIP(nn.Module):
     def __init__(self,
@@ -367,6 +400,115 @@ class CLIP(nn.Module):
 
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
+
+class CLIPPC(nn.Module):
+    def __init__(self,
+                 embed_dim: int,
+                 # 3d_part
+                 pc_length: int ,
+                 pc_width: int ,
+                 pc_heads: int ,
+                 pc_layers: int ,          
+                 # text
+                 context_length: int,
+                 vocab_size: int,
+                 transformer_width: int,
+                 transformer_heads: int,
+                 transformer_layers: int
+                 ):
+        super().__init__()
+
+        self.context_length = context_length
+        self.pc_length = pc_length
+
+        self.visual = PointCloudTransformer(
+            input_channels= 3,
+            width = pc_width,
+            layers= pc_layers,
+            heads= pc_heads,
+            output_channels=embed_dim
+        )
+
+        self.transformer = Transformer(
+            width=transformer_width,
+            layers=transformer_layers,
+            heads=transformer_heads,
+            attn_mask=self.build_attention_mask()
+        )
+
+        self.vocab_size = vocab_size
+        self.token_embedding = nn.Embedding(vocab_size, transformer_width)
+        self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
+        self.ln_final = LayerNorm(transformer_width)
+
+        self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+
+        self.initialize_parameters()
+
+    def initialize_parameters(self):
+        nn.init.normal_(self.token_embedding.weight, std=0.02)
+        nn.init.normal_(self.positional_embedding, std=0.01)
+
+
+        proj_std = (self.transformer.width ** -0.5) * ((2 * self.transformer.layers) ** -0.5)
+        attn_std = self.transformer.width ** -0.5
+        fc_std = (2 * self.transformer.width) ** -0.5
+        for block in self.transformer.resblocks:
+            nn.init.normal_(block.attn.in_proj_weight, std=attn_std)
+            nn.init.normal_(block.attn.out_proj.weight, std=proj_std)
+            nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
+            nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
+
+        if self.text_projection is not None:
+            nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
+
+    def build_attention_mask(self):
+        # lazily create causal attention mask, with full attention between the vision tokens
+        # pytorch uses additive attention mask; fill with -inf
+        mask = torch.empty(self.context_length, self.context_length)
+        mask.fill_(float("-inf"))
+        mask.triu_(1)  # zero out the lower diagonal
+        return mask
+
+    @property
+    def dtype(self):
+        return self.visual.transformer.resblocks[0].attn.in_proj_weight.dtype
+
+    def encode_pc(self, pc):
+        return self.visual(pc.type(self.dtype))
+    
+    def encode_text(self, text):
+        x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
+
+        x = x + self.positional_embedding.type(self.dtype)
+        x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.transformer(x)
+        x = x.permute(1, 0, 2)  # LND -> NLD
+        x = self.ln_final(x).type(self.dtype)
+
+        # x.shape = [batch_size, n_ctx, transformer.width]
+        # take features from the eot embedding (eot_token is the highest number in each sequence)
+        x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+
+        return x
+
+    def forward(self, image, text):
+        pc_features = self.encode_pc(image)
+        text_features = self.encode_text(text)
+
+        # normalized features
+        pc_features = pc_features / pc_features.norm(dim=-1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
+        # cosine similarity as logits
+        logit_scale = self.logit_scale.exp()
+        logits_per_image = logit_scale * pc_features @ text_features.t()
+        logits_per_text = logit_scale * text_features @ pc_features.t()
+
+        # shape = [global_batch_size, global_batch_size]
+        return logits_per_image, logits_per_text
+
 
 
 def convert_weights(model: nn.Module):
