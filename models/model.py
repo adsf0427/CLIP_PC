@@ -259,9 +259,9 @@ class PointCloudTransformer(nn.Module):
         # x = x + self.positional_embedding.to(x.dtype)
 
         x = self.ln_pre(x)
-        # x = x.permute(1, 0, 2)  # NLD -> LND
+        x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
-        # x = x.permute(1, 0, 2)  # LND -> NLD
+        x = x.permute(1, 0, 2)  # LND -> NLD
 
         x = self.ln_post(x[:, 0, :])
 

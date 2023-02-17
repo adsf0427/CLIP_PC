@@ -31,7 +31,7 @@ def main(hparams):
 
     dm = TextPCDataModule.from_argparse_args(hparams)
    
-    trainer = Trainer.from_argparse_args(hparams, precision=32, max_epochs=2000, accelerator="gpu")
+    trainer = Trainer.from_argparse_args(hparams, precision=32, max_epochs=100, accelerator="gpu")
     trainer.fit(model, dm)
 
 

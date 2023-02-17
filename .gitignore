@@ -1,2 +1,13 @@
 lightning_logs
 *.pyc
+*.png
+.idea
+data
+output
+__pycache__
+*.png
+*.net
+*.npy
+*.npz
+slurm_log
+*.zip
