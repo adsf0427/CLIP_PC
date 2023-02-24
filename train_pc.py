@@ -30,15 +30,22 @@ def main(hparams):
     del hparams.model_name
 
     dm = TextPCDataModule.from_argparse_args(hparams)
-   
-    trainer = Trainer.from_argparse_args(hparams, precision=32, max_epochs=100, accelerator="gpu")
-    trainer.fit(model, dm)
 
+    ckpt = hparams.resume
+    # if ckpt:
+    #     model.load_from_checkpoint(ckpt)
+   
+    trainer = Trainer.from_argparse_args(hparams, precision=32, max_epochs=100, accelerator="gpu", strategy="ddp", devices=4)
+    if ckpt :
+        trainer.fit(model, dm, ckpt_path=ckpt)
+    else:
+        trainer.fit(model, dm)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--model_name', type=str, required=True)
     parser.add_argument('--minibatch_size', type=int, default=0)
+    parser.add_argument("--resume", type=str, default=None)
     parser = TextPCDataModule.add_argparse_args(parser)
     parser = Trainer.add_argparse_args(parser)
     args = parser.parse_args()

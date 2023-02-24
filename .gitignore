@@ -11,3 +11,4 @@ __pycache__
 *.npz
 slurm_log
 *.zip
+result.txt

@@ -8,9 +8,12 @@ from torchvision.models import resnet50
 from transformers import AutoTokenizer, AutoModel
 import clip
 from pytorch_lightning.callbacks import ModelCheckpoint
-from datasets.text_pc_dm import ShapeNet15kPointClouds
+from datasets.shapenet_data_pc import ShapeNet15kPointClouds
 import os
 from utils.visualize import *
+from collections import Counter
+from models.model import CLIPPC
+
 synsetid_to_cate = {
     '02691156': 'airplane', '02773838': 'bag', '02801938': 'basket',
     '02808440': 'bathtub', '02818832': 'bed', '02828884': 'bench',
@@ -43,16 +46,29 @@ if __name__ == '__main__':
     with open(config_dir) as fin:
         config = yaml.safe_load(fin)["PC-B"]
     
-    ckpt = "lightning_logs/version_13812725/checkpoints/epoch=9-step=89270.ckpt"
-    ckpt = "lightning_logs/version_13754438/checkpoints/epoch=4-step=44635.ckpt"
+    # ckpt = "lightning_logs/version_13812725/checkpoints/epoch=9-step=89270.ckpt"
+    ckpt = "lightning_logs/version_2/checkpoints/epoch=50-step=113781.ckpt"
     checkpoint = torch.load(ckpt)
-    pl_model = CLIPPCWrapper("PC-B", config, None, 4)
-    pl_model.load_state_dict(checkpoint['state_dict'])
-    model = pl_model.model.to(device)
+    # pl_model = CLIPPCWrapper("PC-B", config, None, 4)
+    # pl_model.load_state_dict(checkpoint['state_dict'])
+    # model = pl_model.model.to(device)
+    model = CLIPPC(**config)
+    state_dict = {}
+    for k, v in checkpoint['state_dict'].items():
+        if k.startswith('model'):
+            state_dict[k[6:]] = v
+    # print(checkpoint['state_dict'].keys())
+    model.load_state_dict(state_dict)
+    model = model.to(device)
+    print(len(state_dict))
+    print(len([*model.parameters()]))
+    exit(0)
+    
 
-    data_dir = os.path.join(os.getenv("SLURM_TMPDIR"), "ShapeNetCore.v2.PC15k")
+    # data_dir = os.path.join(os.getenv("SLURM_TMPDIR"), "ShapeNetCore.v2.PC15k")
+    data_dir = "../ShapeNetCore.v2.PC15k"
     dataset = ShapeNet15kPointClouds(root_dir= data_dir,
-            categories=['car'], split='val',
+            categories=['all'], split='val',
             tr_sample_size=2048,
             te_sample_size=2048,
             scale=1.,
@@ -60,14 +76,17 @@ if __name__ == '__main__':
             normalize_std_per_axis=False,
             random_subsample=False)
 
-    sum = 0
+    sum = Counter()
+    acc = Counter()
+    acc_all = 0
     print(len(dataset))
+
+
     for i in range(10):
         pc, text = dataset[i]
-        # print(text)
         # image, class_id = cifar100[3637]
         image_input = pc.unsqueeze(0).to(device)
-        text_inputs = torch.cat([clip.tokenize(f"{c}") for c in classes]).to(device)
+        text_inputs = torch.cat([clip.tokenize(f"a 3d model of {c}") for c in classes]).to(device)
 
         # Calculate features
         with torch.no_grad():
@@ -81,14 +100,25 @@ if __name__ == '__main__':
         values, indices = similarity[0].topk(5)
 
         # Print the result
-        print("\nTop predictions:\n")
-        for value, index in zip(values, indices):
-            print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
+
+        # print(text)
+        # print("\nTop predictions:\n")
+        # for value, index in zip(values, indices):
+        #     print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
+
         if classes[indices[0]] == text:
-            sum = sum + 1
+            acc[text] = acc[text] + 1
+            acc_all = acc_all + 1
+        sum[text] = sum[text] + 1
         
-        visualize_pointcloud_batch('test.png' ,
-                            pc.repeat(25, 1, 1).transpose(1,2), None, None,
-                            None)
+        # visualize_pointcloud_batch('test.png' ,
+        #                     pc.repeat(25, 1, 1).transpose(1,2), None, None,
+        #                     None)
+        if i % 100 == 0:
+            print(i)
+    for key in sum.keys():
+        print(f"{key:>16s} : {100 * acc[key] / sum[key]:.2f}%")
         
+    print(acc)
     print(sum)
+    print(acc_all)

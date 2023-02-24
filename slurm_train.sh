@@ -17,4 +17,10 @@ cd $SLURM_TMPDIR
 unzip /home/zyliang/scratch/ShapeNetCore.v2.PC15k.zip
 
 cd /lustre07/scratch/zyliang/train-CLIP
-python train_pc.py --model_name PC-B --root_dir ''$SLURM_TMPDIR/ShapeNetCore.v2.PC15k/'' --batch_size 4
+python train_pc.py --model_name PC-B --root_dir ''$SLURM_TMPDIR/ShapeNetCore.v2.PC15k/'' --batch_size 64
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+python train_pc.py --model_name PC-B --root_dir ''../ShapeNetCore.v2.PC15k/'' --batch_size 4 \
+--resume "lightning_logs/version_0/checkpoints/epoch=29-step=66930.ckpt"
+
+CUDA_VISIBLE_DEVICES=4 python test.py

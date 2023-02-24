@@ -208,10 +208,11 @@ class Uniform15KPC(Dataset):
 
     
         description = synsetid_to_cate[out['sid']]
+        description = f"a 3d model of {description}"
         tokenized_text = clip.tokenize(description)[0]
 
-        # return out['train_points'].transpose(0, 1), tokenized_text
-        return out['train_points'].transpose(0, 1), description
+        return out['train_points'].transpose(0, 1), tokenized_text
+        # return out['train_points'].transpose(0, 1), description
 
 
 class ShapeNet15kPointClouds(Uniform15KPC):
