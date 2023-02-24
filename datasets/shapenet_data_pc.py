@@ -7,6 +7,7 @@ import random
 import open3d as o3d
 import numpy as np
 import torch.nn.functional as F
+import clip
 
 # taken from https://github.com/optas/latent_3d_points/blob/8e8f29f8124ed5fc59439e8551ba7ef7567c9a37/src/in_out.py
 synsetid_to_cate = {
@@ -195,7 +196,12 @@ class Uniform15KPC(Dataset):
             tr_mask = self.mask_transform(tr_out)
             out['train_masks'] = tr_mask
 
-        return out
+    
+        description = synsetid_to_cate[out['sid']]
+        tokenized_text = clip.tokenize(description)[0]
+
+        # return out['train_points'].transpose(0, 1), tokenized_text
+        return out['train_points'].transpose(0, 1), description
 
 
 class ShapeNet15kPointClouds(Uniform15KPC):

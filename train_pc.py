@@ -26,12 +26,12 @@ def main(hparams):
     if hparams.minibatch_size < 1:
         hparams.minibatch_size = hparams.batch_size
 
-    model = CLIPPCWrapper(hparams.model_name, config, txt_encoder, hparams.minibatch_size)
+    model = CLIPPCWrapper(hparams.model_name, config, txt_encoder, hparams.minibatch_size, freeze_text=True)
     del hparams.model_name
 
     dm = TextPCDataModule.from_argparse_args(hparams)
    
-    trainer = Trainer.from_argparse_args(hparams, precision=32, max_epochs=100, accelerator="gpu")
+    trainer = Trainer.from_argparse_args(hparams, precision=32, max_epochs=100, accelerator="gpu", strategy="ddp", devices=2)
     trainer.fit(model, dm)
 
 

@@ -152,12 +152,20 @@ class CLIPWrapper(pl.LightningModule):
 
         return {'optimizer': optimizer, 'lr_scheduler': lr_scheduler}
 
+
+def disabled_train(self, mode=True):
+    """Overwrite model.train with this function to make sure train/eval mode
+    does not change anymore."""
+    return self
+
+
 class CLIPPCWrapper(pl.LightningModule):
     def __init__(self,
                  model_name: str,
                  config: dict,
                  txt_encoder,
-                 minibatch_size: int
+                 minibatch_size: int,
+                 freeze_text: bool = False
                  ):
         """A lightning wrapper for a CLIP model as specified in the paper.
 
@@ -172,6 +180,11 @@ class CLIPPCWrapper(pl.LightningModule):
         self.minibatch_size = minibatch_size
         if txt_encoder:
             self.model.transformer = txt_encoder
+        if freeze_text:
+            self.model.transformer = self.model.transformer.eval()
+            self.model.transformer.train = disabled_train
+            for param in self.model.transformer.parameters():
+                param.requires_grad_(False)
 
         self.automatic_optimization = False
     
