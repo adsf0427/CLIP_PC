@@ -41,13 +41,15 @@ classes = list(synsetid_to_cate.values())
 if __name__ == '__main__':
     # pl_model = CLIPPCWrapper.load_from_checkpoint(
         # "lightning_logs/version_13754438/checkpoints/epoch=4-step=44635.ckpt")
-    device = "cuda" if torch.cuda.is_available() else "cpu"   
+    sssss = "cuda" if torch.cuda.is_available() else "cpu"   
     config_dir = 'models/configs/PC.yaml'
     with open(config_dir) as fin:
         config = yaml.safe_load(fin)["PC-B"]
     
     # ckpt = "lightning_logs/version_13812725/checkpoints/epoch=9-step=89270.ckpt"
     ckpt = "lightning_logs/version_2/checkpoints/epoch=50-step=113781.ckpt"
+    # ckpt = "lightning_logs/version_13812725/checkpoints/epoch=9-step=89270.ckpt"
+    # ckpt = "lightning_logs/version_13942716/checkpoints/epoch=10-step=49093.ckpt"
     checkpoint = torch.load(ckpt)
     # pl_model = CLIPPCWrapper("PC-B", config, None, 4)
     # pl_model.load_state_dict(checkpoint['state_dict'])
@@ -82,7 +84,7 @@ if __name__ == '__main__':
     print(len(dataset))
 
 
-    for i in range(10):
+    for i in range(100):
         pc, text = dataset[i]
         # image, class_id = cifar100[3637]
         image_input = pc.unsqueeze(0).to(device)
@@ -102,18 +104,19 @@ if __name__ == '__main__':
         # Print the result
 
         # print(text)
-        # print("\nTop predictions:\n")
-        # for value, index in zip(values, indices):
-        #     print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
+        # print(text)
+        # # print("\nTop predictions:\n")
+        # # for value, index in zip(values, indices):
+        # #     print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
 
         if classes[indices[0]] == text:
             acc[text] = acc[text] + 1
             acc_all = acc_all + 1
         sum[text] = sum[text] + 1
         
-        # visualize_pointcloud_batch('test.png' ,
-        #                     pc.repeat(25, 1, 1).transpose(1,2), None, None,
-        #                     None)
+        # # visualize_pointcloud_batch('test.png' ,
+        # #                     pc.repeat(25, 1, 1).transpose(1,2), None, None,
+        # #                     None)
         if i % 100 == 0:
             print(i)
     for key in sum.keys():

@@ -26,7 +26,7 @@ def main(hparams):
     if hparams.minibatch_size < 1:
         hparams.minibatch_size = hparams.batch_size
 
-    model = CLIPPCWrapper(hparams.model_name, config, txt_encoder, hparams.minibatch_size)
+    model = CLIPPCWrapper(hparams.model_name, config, txt_encoder, hparams.minibatch_size, freeze_text=True)
     del hparams.model_name
 
     dm = TextPCDataModule.from_argparse_args(hparams)
